@@ -11,8 +11,7 @@ proc parse(data: string, getFields: seq[GetField]) =
 proc decrypt(gpgBinary: string,
              filename: string): tuple[output: string, exitCode: int] =
   let cmd = &"{gpgBinary} --decrypt --quiet {quoteShell(filename)}"
-  let (output, exitCode) = execCmdEx(cmd)
-  return (output, exitCode)
+  result = execCmdEx(cmd)
 
 proc main(storePath: string,
           groupingBase: string,
