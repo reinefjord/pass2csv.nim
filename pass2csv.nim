@@ -1,10 +1,15 @@
 import os, osproc, parseopt, strformat, strutils
 
-proc parse(data: string) =
+type
+  GetField = tuple
+    name: string
+    pattern: string
+
+proc parse(data: string, getFields: seq[GetField]) =
   echo(data)
 
 proc decrypt(gpgBinary: string,
-             filename: string): tuple[output: TaintedString, exitCode: int] =
+             filename: string): tuple[output: string, exitCode: int] =
   let cmd = &"{gpgBinary} --decrypt --quiet {quoteShell(filename)}"
   let (output, exitCode) = execCmdEx(cmd)
   return (output, exitCode)
@@ -12,7 +17,8 @@ proc decrypt(gpgBinary: string,
 proc main(storePath: string,
           groupingBase: string,
           gpgBinary: string,
-          outFile: string) =
+          outFile: string,
+          getFields: seq[GetField]) =
   var failures: seq[string]
   for path in walkDirRec(storePath, relative = true):
     if path.startsWith(".git"):
@@ -26,17 +32,18 @@ proc main(storePath: string,
       echo(output)
       failures.add(path)
       continue
-    parse(output)
+    parse(output, getFields)
   echo("Failed to decrypt: ")
   for failed in failures:
     echo(failed)
 
 when isMainModule:
-  var storePath: string
-  var groupingBase: string
-  var gpgBinary = "gpg"
-  var outFile = "-"
-  var getFields: seq[tuple[name: string, pattern: string]]
+  var
+    storePath: string
+    groupingBase: string
+    gpgBinary = "gpg"
+    outFile = "-"
+    getFields: seq[GetField]
   for kind, key, val in getopt():
     case kind
     of cmdArgument:
@@ -55,11 +62,11 @@ when isMainModule:
           if val == "":
             echo(&"Missing a pattern for field '{fieldName}'.")
             quit(1)
-          let field = (name: fieldName, pattern: val)
+          let field: GetField = (name: fieldName, pattern: val)
           getFields.add(field)
         else:
           echo(&"Unknown argument '{key}'.")
-          quit(QuitFailure)
+          quit(1)
     of cmdEnd:
       assert(false)
   if storePath == "":
@@ -67,5 +74,4 @@ when isMainModule:
     quit(1)
   if groupingBase == "":
     groupingBase = storePath
-  echo(getFields)
-  main(storePath, groupingBase, gpgBinary, outFile)
+  main(storePath, groupingBase, gpgBinary, outFile, getFields)
