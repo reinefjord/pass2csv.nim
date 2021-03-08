@@ -1,22 +1,40 @@
-import os, osproc, parseopt, strformat, strutils
+import os, osproc, parseopt, strformat, strutils, unicode
 
 type
-  GetField = tuple
+  GetField = object
     name: string
     pattern: string
 
-proc parse(data: string, getFields: seq[GetField]) =
-  echo(data)
+  EntryData = object
+    group: string
+    title: string
+    password: string
+    fields: seq[tuple[fieldName: string, value: string]]
+    notes: string
 
-proc decrypt(gpgBinary: string,
-             filename: string): tuple[output: string, exitCode: int] =
+proc setMeta(entry: var EntryData; groupingBase, path: string) =
+  discard
+
+proc setData(entry: var EntryData, data: string, getFields: seq[GetField]) =
+  let lines = splitLines(data)
+  var tail = lines[1 .. ^1]
+  entry.password = lines[0]
+  for field in getFields:
+    for i, line in tail:
+      if line.toLower().startsWith(field.pattern.toLower()):
+        let
+          value = strutils.strip(line.split(':', 1)[1])
+          fieldMatch = (fieldName: field.name, value: value)
+        entry.fields.add(fieldMatch)
+        tail.delete(i)
+        break
+  entry.notes = tail.join("\n")
+
+proc decrypt(gpgBinary, filename: string): tuple[output: string, exitCode: int] =
   let cmd = &"{gpgBinary} --decrypt --quiet {quoteShell(filename)}"
   result = execCmdEx(cmd)
 
-proc main(storePath: string,
-          groupingBase: string,
-          gpgBinary: string,
-          outFile: string,
+proc main(storePath, groupingBase, gpgBinary, outFile: string,
           getFields: seq[GetField]) =
   var failures: seq[string]
   for path in walkDirRec(storePath, relative = true):
@@ -31,7 +49,9 @@ proc main(storePath: string,
       echo(output)
       failures.add(path)
       continue
-    parse(output, getFields)
+    var entry: EntryData
+    entry.setData(output, getFields)
+    echo(entry)
   echo("Failed to decrypt: ")
   for failed in failures:
     echo(failed)
@@ -61,7 +81,7 @@ when isMainModule:
           if val == "":
             echo(&"Missing a pattern for field '{fieldName}'.")
             quit(1)
-          let field: GetField = (name: fieldName, pattern: val)
+          let field = GetField(name: fieldName, pattern: val)
           getFields.add(field)
         else:
           echo(&"Unknown argument '{key}'.")
