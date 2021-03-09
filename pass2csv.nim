@@ -1,4 +1,4 @@
-import os, osproc, parseopt, strformat, strutils, unicode
+import os, osproc, parseopt, strformat, strutils
 
 type
   GetField = object
