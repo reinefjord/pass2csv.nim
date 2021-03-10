@@ -80,10 +80,9 @@ proc main(storePath, groupingBase, gpgBinary, outFile: string;
     var entry: EntryData
     entry.setMeta(joinPath(storePath, path), groupingBase)
     entry.setData(output, exclude, getFields)
-    writeLine(stderr, entry)
     entries.add(entry)
   if failures.len() > 0:
-    writeLine(stderr, "Failed to decrypt: ")
+    writeLine(stderr, "\nFailed to decrypt: ")
     for failed in failures:
       writeLine(stderr, failed)
   outFile.write(entries, getFields)
