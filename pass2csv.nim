@@ -12,8 +12,11 @@ type
     fields: seq[tuple[fieldName: string, value: string]]
     notes: string
 
-proc setMeta(entry: var EntryData; groupingBase, path: string) =
-  discard
+proc setMeta(entry: var EntryData; path, groupingBase: string) =
+  let relPath = relativePath(path, groupingBase)
+  let fileSplit = splitFile(relPath)
+  entry.group = fileSplit.dir
+  entry.title = fileSplit.name
 
 proc setData(entry: var EntryData, data: string, getFields: seq[GetField]) =
   let lines = splitLines(data)
@@ -22,9 +25,8 @@ proc setData(entry: var EntryData, data: string, getFields: seq[GetField]) =
   for field in getFields:
     for i, line in tail:
       if line.toLower().startsWith(field.pattern.toLower()):
-        let
-          value = strutils.strip(line.split(':', 1)[1])
-          fieldMatch = (fieldName: field.name, value: value)
+        let value = strutils.strip(line.split(':', 1)[1])
+        let fieldMatch = (fieldName: field.name, value: value)
         entry.fields.add(fieldMatch)
         tail.delete(i)
         break
@@ -43,18 +45,20 @@ proc main(storePath, groupingBase, gpgBinary, outFile: string,
     if not path.endsWith(".gpg"):
       continue
     echo("Processing " & path)
-    let (output, exitCode) = decrypt(gpgBinary, storePath & path)
+    let (output, exitCode) = decrypt(gpgBinary, joinPath(storePath, path))
     if exitCode != 0:
       echo(&"{gpgBinary} exited with code {exitCode}:")
       echo(output)
       failures.add(path)
       continue
     var entry: EntryData
+    entry.setMeta(joinPath(storePath, path), groupingBase)
     entry.setData(output, getFields)
     echo(entry)
-  echo("Failed to decrypt: ")
-  for failed in failures:
-    echo(failed)
+  if failures.len() > 0:
+    echo("Failed to decrypt: ")
+    for failed in failures:
+      echo(failed)
 
 when isMainModule:
   var
@@ -66,13 +70,16 @@ when isMainModule:
   for kind, key, val in getopt():
     case kind
     of cmdArgument:
-      storePath = key
+      if storePath != "":
+        echo(&"Unexpected argument '{key}', only one path can be given.")
+        quit(1)
+      storePath = key.expandTilde().normalizedPath()
     of cmdLongOption, cmdShortOption:
       case key
       of "gpgbinary", "g":
         gpgBinary = val
       of "base", "b":
-        groupingBase = val
+        groupingBase = val.expandTilde().normalizedPath()
       of "outfile", "o":
         outFile = val
       else:
