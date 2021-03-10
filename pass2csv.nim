@@ -43,7 +43,7 @@ proc setData(entry: var EntryData; data: string; exclude: seq[Regex];
 
 proc decrypt(gpgBinary, filename: string): tuple[output: string, exitCode: int] =
   let cmd = &"{gpgBinary} --decrypt --quiet {quoteShell(filename)}"
-  result = execCmdEx(cmd)
+  return execCmdEx(cmd)
 
 proc main(storePath, groupingBase, gpgBinary, outFile: string;
           exclude: seq[Regex]; getFields: seq[GetField]) =
