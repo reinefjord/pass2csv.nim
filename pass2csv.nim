@@ -86,7 +86,7 @@ when isMainModule:
       storePath = key.expandTilde().normalizedPath()
     of cmdLongOption, cmdShortOption:
       case key
-      of "gpgbinary", "g":
+      of "gpg", "g":
         gpgBinary = val
       of "base", "b":
         groupingBase = val.expandTilde().normalizedPath()
