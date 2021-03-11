@@ -33,13 +33,13 @@ proc setData(entry: var EntryData; data: string; exclude: seq[Regex];
       let match = line.findBounds(field.pattern)
       if match != (-1, 0):
         let inverseMatch = line[0 ..< match[0]] & line[match[1] + 1 .. ^1]
-        let value = strutils.strip(inverseMatch)
+        let value = inverseMatch.strip()
         entry.fields[field.name] = value
         tail.delete(i)
         break
   entry.notes = tail.join("\n").strip()
 
-proc decrypt(gpgBinary, filename: string): tuple[output: string, exitCode: int] =
+proc decrypt(gpgBinary, filename: string): tuple[output: string; exitCode: int] =
   let cmd = &"{gpgBinary} --decrypt --quiet {quoteShell(filename)}"
   return execCmdEx(cmd)
 
@@ -70,11 +70,11 @@ proc main(storePath, groupingBase, gpgBinary, outFile: string;
       continue
     if not path.endsWith(".gpg"):
       continue
-    writeLine(stderr, "Processing " & path)
+    stderr.writeLine("Processing " & path)
     let (output, exitCode) = decrypt(gpgBinary, joinPath(storePath, path))
     if exitCode != 0:
-      writeLine(stderr, &"{gpgBinary} exited with code {exitCode}:")
-      writeLine(stderr, output)
+      stderr.writeLine(&"{gpgBinary} exited with code {exitCode}:")
+      stderr.writeLine(output)
       failures.add(path)
       continue
     var entry: EntryData
@@ -82,9 +82,9 @@ proc main(storePath, groupingBase, gpgBinary, outFile: string;
     entry.setData(output, exclude, getFields)
     entries.add(entry)
   if failures.len() > 0:
-    writeLine(stderr, "\nFailed to decrypt: ")
+    stderr.writeLine("\nFailed to decrypt: ")
     for failed in failures:
-      writeLine(stderr, failed)
+      stderr.writeLine(failed)
   outFile.write(entries, getFields)
 
 when isMainModule:
@@ -99,7 +99,7 @@ when isMainModule:
     case kind
     of cmdArgument:
       if storePath != "":
-        writeLine(stderr, &"Unexpected argument '{key}', only one path can be given.")
+        stderr.writeLine(&"Unexpected argument '{key}', only one path can be given.")
         quit(1)
       storePath = key.expandTilde().normalizedPath()
     of cmdLongOption, cmdShortOption:
@@ -116,18 +116,18 @@ when isMainModule:
         if key.startsWith("get-"):
           let fieldName = key[4 .. ^1]
           if val == "":
-            writeLine(stderr, &"Missing a pattern for field '{fieldName}'.")
+            stderr.writeLine(&"Missing a pattern for field '{fieldName}'.")
             quit(1)
           let pattern = re(val, flags = {reStudy, reIgnoreCase})
           let field = GetField(name: fieldName, pattern: pattern)
           getFields.add(field)
         else:
-          writeLine(stderr, &"Unknown argument '{key}'.")
+          stderr.writeLine(&"Unknown argument '{key}'.")
           quit(1)
     of cmdEnd:
       assert(false)
   if storePath == "":
-    writeLine(stderr, "Please provide a path to your password store.")
+    stderr.writeLine("Please provide a path to your password store.")
     quit(1)
   if groupingBase == "":
     groupingBase = storePath
