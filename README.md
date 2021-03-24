@@ -2,7 +2,8 @@
 
 This is a rewrite of [pass2csv](https://github.com/reinefjord/pass2csv)
 in [Nim](https://nim-lang.org) with a more flexible cli interface and
-less messy code.
+less messy code. The source code is available at
+[GitHub](https://github.com/reinefjord/pass2csv.nim).
 
 ## Usage
 
