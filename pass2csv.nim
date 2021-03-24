@@ -9,9 +9,12 @@ from that subdirectory.
 Options:
   -h, --help                       Print a long help message.
   -b:path, --base:path             Path to use as base for grouping passwords.
+  -o:filename, --outfile:filename  File to write data to (default: stdout).
   -g:path, --gpg:path              Which gpg binary you wish to use
                                    (default: 'gpg').
-  -o:filename, --outfile:filename  File to write data to (default: stdout).
+  -a, --use-agent                  Asks gpg to connect to an agent. Does
+                                   nothing with gpg2 as gpg2 always uses
+                                   an agent.
   -e:regexp, --exclude:regexp      Exclude lines containing a regexp match.
   --get-<name>:regexp              Search for regexp and put the rest of the
                                    line in a field named <name>.
@@ -102,8 +105,13 @@ proc setData(entry: var EntryData; data: string; exclude: seq[Regex];
         break
   entry.notes = tail.join("\n").strip()
 
-proc decrypt(gpgBinary, filename: string): tuple[output: string; exitCode: int] =
-  let cmd = &"{gpgBinary} --decrypt --quiet {quoteShell(filename)}"
+proc decrypt(gpgBinary, filename: string;
+             useAgent: bool): tuple[output: string; exitCode: int] =
+  var cmd: string
+  if useAgent:
+    cmd = &"{gpgBinary} --decrypt --quiet --use-agent {quoteShell(filename)}"
+  else:
+    cmd = &"{gpgBinary} --decrypt --quiet {quoteShell(filename)}"
   return execCmdEx(cmd)
 
 proc write(outFile: string; entries: seq[EntryData]; getFields: seq[GetField]) =
@@ -124,7 +132,7 @@ proc write(outFile: string; entries: seq[EntryData]; getFields: seq[GetField]) =
     let row = columns.join(",")
     file.writeLine(row)
 
-proc main(storePath, groupingBase, gpgBinary, outFile: string;
+proc main(storePath, groupingBase, outFile, gpgBinary: string; useAgent: bool;
           exclude: seq[Regex]; getFields: seq[GetField]) =
   var entries: seq[EntryData]
   var failures: seq[string]
@@ -134,7 +142,7 @@ proc main(storePath, groupingBase, gpgBinary, outFile: string;
     if not path.endsWith(".gpg"):
       continue
     stderr.writeLine("Processing " & path)
-    let (output, exitCode) = decrypt(gpgBinary, joinPath(storePath, path))
+    let (output, exitCode) = decrypt(gpgBinary, joinPath(storePath, path), useAgent)
     if exitCode != 0:
       stderr.writeLine(&"{gpgBinary} exited with code {exitCode}:")
       stderr.writeLine(output)
@@ -155,6 +163,7 @@ when isMainModule:
     storePath: string
     groupingBase: string
     gpgBinary = "gpg"
+    useAgent = false
     outFile = "-"
     exclude: seq[Regex]
     getFields: seq[GetField]
@@ -172,6 +181,8 @@ when isMainModule:
         quit(0)
       of "gpg", "g":
         gpgBinary = val
+      of "use-agent", "a":
+        useAgent = true
       of "base", "b":
         groupingBase = val.expandTilde().normalizedPath()
       of "outfile", "o":
@@ -197,4 +208,4 @@ when isMainModule:
     quit(1)
   if groupingBase == "":
     groupingBase = storePath
-  main(storePath, groupingBase, gpgBinary, outFile, exclude, getFields)
+  main(storePath, groupingBase, outFile, gpgBinary, useAgent, exclude, getFields)
