@@ -114,23 +114,35 @@ proc decrypt(gpgBinary, filename: string;
     cmd = &"{gpgBinary} --decrypt --quiet {quoteShell(filename)}"
   return execCmdEx(cmd)
 
+proc fmtCsvRow(columns: seq[string]): string =
+  var formatted: seq[string]
+  for col in columns:
+    if col.contains({',', '\n', '"'}):
+      let quotesEscaped = col.replace("\"", "\"\"")
+      formatted.add(&"\"{quotesEscaped}\"")
+    else:
+      formatted.add(col)
+  return formatted.join(",")
+
 proc write(outFile: string; entries: seq[EntryData]; getFields: seq[GetField]) =
   var file: File
   if outFile == "-":
     file = stdout
   else:
     file = open(outFile, fmWrite)
+
+  var fieldNames: seq[string]
+  for field in getFields:
+    fieldNames.add(field.name)
+  let header = @["Group(/)", "Title", "Password"] & fieldNames & @["Notes"]
+  file.writeLine(fmtCsvRow(header))
+
   for entry in entries:
     var fields: seq[string]
     for field in getFields:
       fields.add(entry.fields.getOrDefault(field.name))
     var columns = @[entry.group, entry.title, entry.password] & fields & @[entry.notes]
-    for i, col in columns:
-      if col.contains({',', '\n', '"'}):
-        let quotesEscaped = col.replace("\"", "\"\"")
-        columns[i] = &"\"{quotesEscaped}\""
-    let row = columns.join(",")
-    file.writeLine(row)
+    file.writeLine(fmtCsvRow(columns))
 
 proc main(storePath, groupingBase, outFile, gpgBinary: string; useAgent: bool;
           exclude: seq[Regex]; getFields: seq[GetField]) =
