@@ -205,7 +205,7 @@ when isMainModule:
         if key.startsWith("get-"):
           let fieldName = key[4 .. ^1]
           if val == "":
-            stderr.writeLine(&"Missing a pattern for field '{fieldName}'.")
+            stderr.writeLine(&"Missing a pattern for '{key}'.")
             quit(1)
           let pattern = re(val, flags = {reStudy, reIgnoreCase})
           let field = GetField(name: fieldName, pattern: pattern)
