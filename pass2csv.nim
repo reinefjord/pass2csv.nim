@@ -64,13 +64,11 @@ proc write(outFile: string; entries: seq[EntryData]; getFields: seq[GetField]) =
     file = stdout
   else:
     file = open(outFile, fmWrite)
-
   var fieldNames: seq[string]
   for field in getFields:
     fieldNames.add(field.name)
   let header = @["Group(/)", "Title", "Password"] & fieldNames & @["Notes"]
   file.writeLine(fmtCsvRow(header))
-
   for entry in entries:
     var fields: seq[string]
     for field in getFields:
@@ -82,20 +80,21 @@ proc main(storePath, groupingBase, outFile, gpgBinary: string; useAgent: bool;
           exclude: seq[Regex]; getFields: seq[GetField]) =
   var entries: seq[EntryData]
   var failures: seq[string]
-  for path in walkDirRec(storePath, relative = true):
-    if path.startsWith(".git"):
+  for relPath in walkDirRec(storePath, relative = true):
+    if relPath.startsWith(".git"):
       continue
-    if not path.endsWith(".gpg"):
+    if not relPath.endsWith(".gpg"):
       continue
-    stderr.writeLine("Processing " & path)
-    let (output, exitCode) = decrypt(gpgBinary, joinPath(storePath, path), useAgent)
+    let fullPath = joinPath(storePath, relPath)
+    stderr.writeLine("Processing " & relPath)
+    let (output, exitCode) = gpgBinary.decrypt(fullPath, useAgent)
     if exitCode != 0:
       stderr.writeLine(&"{gpgBinary} exited with code {exitCode}:")
       stderr.writeLine(output)
-      failures.add(path)
+      failures.add(relPath)
       continue
     var entry: EntryData
-    entry.setMeta(joinPath(storePath, path), groupingBase)
+    entry.setMeta(fullPath, groupingBase)
     entry.setData(output, exclude, getFields)
     entries.add(entry)
   if failures.len() > 0:
